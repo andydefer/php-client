@@ -4,22 +4,12 @@ declare(strict_types=1);
 
 namespace AndyDefer\PhpClient\Abstracts;
 
-use AndyDefer\DomainStructures\Interfaces\Transformable;
-use AndyDefer\DomainStructures\Normalizers\NormalizerChain;
-use AndyDefer\DomainStructures\Traits\Hydratable;
 use AndyDefer\PhpClient\Enums\ContentType;
 use InvalidArgumentException;
 use JsonException;
 
-abstract class Struct implements Transformable
+abstract class Struct extends HydratableStructure
 {
-    use Hydratable;
-
-    public function toArray(): array
-    {
-        return NormalizerChain::get()->normalize($this);
-    }
-
     /**
      * Encode la structure vers le format spécifié
      */

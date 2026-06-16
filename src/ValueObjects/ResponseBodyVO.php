@@ -15,6 +15,8 @@ use JsonException;
  * Response Body Value Object
  *
  * Représente le corps d'une réponse HTTP de manière immutable et typée.
+ *
+ * @template T of Struct
  */
 final class ResponseBodyVO extends AbstractValueObject
 {
@@ -26,21 +28,21 @@ final class ResponseBodyVO extends AbstractValueObject
 
     private readonly ?Struct $struct;
 
+    /**
+     * @param  class-string<T>  $structClass
+     */
     public function __construct(
         mixed $content,
+        string $structClass,
         ContentType $contentType = ContentType::JSON,
         Encoding $encoding = Encoding::UTF_8,
-        ?string $structClass = null
     ) {
         $this->content = $content;
         $this->contentType = $contentType;
         $this->encoding = $encoding;
 
         $this->validateContent($content, $contentType);
-
-        $this->struct = $structClass !== null
-            ? $this->hydrateStruct($structClass)
-            : null;
+        $this->struct = $this->hydrateStruct($structClass);
     }
 
     public function getContent(): mixed
@@ -63,6 +65,9 @@ final class ResponseBodyVO extends AbstractValueObject
             : '';
     }
 
+    /**
+     * @return T|null
+     */
     public function getValue(): ?Struct
     {
         return $this->struct;
@@ -120,14 +125,17 @@ final class ResponseBodyVO extends AbstractValueObject
         }
 
         if ($this->contentType->isJson()) {
-            return $this->formatJson();
+            try {
+                return $this->formatJson();
+            } catch (InvalidArgumentException $e) {
+                return ['content' => $this->content];
+            }
         }
 
         if ($this->contentType->isForm()) {
             return $this->formatForm();
         }
 
-        // Content-Type non supporté pour le formatage
         if (is_array($this->content)) {
             return $this->content;
         }
@@ -148,7 +156,13 @@ final class ResponseBodyVO extends AbstractValueObject
         }
 
         try {
-            return json_decode($this->content, false, 512, JSON_THROW_ON_ERROR);
+            $decoded = json_decode($this->content, false, 512, JSON_THROW_ON_ERROR);
+
+            if ($decoded === null) {
+                return [];
+            }
+
+            return $decoded;
         } catch (JsonException $e) {
             throw new InvalidArgumentException(
                 sprintf('Invalid JSON: %s', $e->getMessage())
@@ -171,62 +185,6 @@ final class ResponseBodyVO extends AbstractValueObject
         throw new InvalidArgumentException(
             sprintf('Cannot decode form data from type: %s', gettype($this->content))
         );
-    }
-
-    /**
-     * @deprecated Utilisez format() à la place
-     */
-    public function toArray(): array
-    {
-        return $this->format();
-    }
-
-    /**
-     * @deprecated Utilisez format() à la place
-     */
-    public function toJson(): array|object
-    {
-        if (! $this->contentType->isJson()) {
-            throw new InvalidArgumentException(
-                sprintf('Content type is %s, not JSON', $this->contentType->value)
-            );
-        }
-
-        return $this->formatJson();
-    }
-
-    /**
-     * @deprecated Utilisez format() à la place
-     */
-    public function toForm(): array
-    {
-        if (! $this->contentType->isForm()) {
-            throw new InvalidArgumentException(
-                sprintf('Content type is %s, not FORM', $this->contentType->value)
-            );
-        }
-
-        return $this->formatForm();
-    }
-
-    /**
-     * @deprecated Utilisez format() à la place
-     */
-    public function toProblem(): array
-    {
-        if (! $this->isProblemJson()) {
-            throw new InvalidArgumentException(
-                sprintf('Content is not a Problem JSON, type: %s', $this->contentType->value)
-            );
-        }
-
-        $data = $this->format();
-
-        if (! isset($data['type']) || ! isset($data['title'])) {
-            throw new InvalidArgumentException('Invalid Problem JSON: missing "type" or "title" fields');
-        }
-
-        return (array) $data;
     }
 
     private function validateContent(mixed $content, ContentType $contentType): void
@@ -273,7 +231,11 @@ final class ResponseBodyVO extends AbstractValueObject
         }
     }
 
-    private function hydrateStruct(string $structClass): Struct
+    /**
+     * @param  class-string<T>  $structClass
+     * @return T|null
+     */
+    private function hydrateStruct(string $structClass): ?Struct
     {
         if (! is_subclass_of($structClass, Struct::class)) {
             throw new InvalidArgumentException(
@@ -281,6 +243,20 @@ final class ResponseBodyVO extends AbstractValueObject
             );
         }
 
-        return $structClass::from($this->format());
+        try {
+            $data = $this->format();
+
+            if (is_object($data)) {
+                $data = (array) $data;
+            }
+
+            if (! is_array($data)) {
+                $data = [];
+            }
+
+            return $structClass::from($data);
+        } catch (InvalidArgumentException $e) {
+            return null;
+        }
     }
 }

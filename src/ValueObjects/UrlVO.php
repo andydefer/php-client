@@ -21,13 +21,21 @@ final class UrlVO extends AbstractValueObject
 
     private readonly ?string $fragment;
 
-    public function __construct(private readonly string $value)
+    private readonly string $value;
+
+    public function __construct(string $value)
     {
-        if (! filter_var($value, FILTER_VALIDATE_URL)) {
+        // Si l'URL n'a pas de schéma, on ajoute https:// par défaut pour la validation
+        $urlToValidate = $value;
+        if (! preg_match('/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//', $value)) {
+            $urlToValidate = 'https://'.$value;
+        }
+
+        if (! filter_var($urlToValidate, FILTER_VALIDATE_URL)) {
             throw new InvalidArgumentException("Invalid URL: {$value}");
         }
 
-        $parts = parse_url($value);
+        $parts = parse_url($urlToValidate);
 
         $this->scheme = $parts['scheme'] ?? 'https';
         $this->host = $parts['host'] ?? '';
@@ -35,6 +43,7 @@ final class UrlVO extends AbstractValueObject
         $this->path = $parts['path'] ?? '/';
         $this->query = new UrlQueryVO($parts['query'] ?? '');
         $this->fragment = $parts['fragment'] ?? null;
+        $this->value = $value;
     }
 
     public function getValue(): string
@@ -100,33 +109,47 @@ final class UrlVO extends AbstractValueObject
 
     public function withPath(string $path): self
     {
-        return new self($this->getBaseUrl().$path);
+        $newValue = $this->getBaseUrl().$path;
+
+        if (! $this->query->isEmpty()) {
+            $newValue .= '?'.$this->query->toString();
+        }
+
+        if ($this->fragment !== null) {
+            $newValue .= '#'.$this->fragment;
+        }
+
+        return new self($newValue);
     }
 
     public function withQuery(UrlQueryVO $query): self
     {
-        $url = $this->getBaseUrl().$this->path;
+        $newValue = $this->getBaseUrl().$this->path;
 
         if (! $query->isEmpty()) {
-            $url .= '?'.$query->toString();
+            $newValue .= '?'.$query->toString();
         }
 
-        return new self($url);
+        if ($this->fragment !== null) {
+            $newValue .= '#'.$this->fragment;
+        }
+
+        return new self($newValue);
     }
 
     public function withFragment(?string $fragment): self
     {
-        $url = $this->getBaseUrl().$this->path;
+        $newValue = $this->getBaseUrl().$this->path;
 
         if (! $this->query->isEmpty()) {
-            $url .= '?'.$this->query->toString();
+            $newValue .= '?'.$this->query->toString();
         }
 
         if ($fragment !== null) {
-            $url .= '#'.$fragment;
+            $newValue .= '#'.$fragment;
         }
 
-        return new self($url);
+        return new self($newValue);
     }
 
     public function __toString(): string

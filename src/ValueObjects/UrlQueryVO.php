@@ -8,9 +8,9 @@ use AndyDefer\DomainStructures\Abstracts\AbstractValueObject;
 
 final class UrlQueryVO extends AbstractValueObject
 {
-    private readonly array $parameters;
+    private array $parameters = [];
 
-    public function __construct(private readonly string $value = '')
+    public function __construct(private string $value = '')
     {
         parse_str($value, $this->parameters);
     }
@@ -48,9 +48,14 @@ final class UrlQueryVO extends AbstractValueObject
     public function withParameter(string $key, mixed $value): self
     {
         $params = $this->parameters;
-        $params[$key] = $value;
 
-        return new self(http_build_query($params));
+        if ($value === null) {
+            $params[$key] = '';
+        } else {
+            $params[$key] = $value;
+        }
+
+        return new self(http_build_query($params, '', '&', PHP_QUERY_RFC3986));
     }
 
     public function withoutParameter(string $key): self
@@ -58,12 +63,25 @@ final class UrlQueryVO extends AbstractValueObject
         $params = $this->parameters;
         unset($params[$key]);
 
-        return new self(http_build_query($params));
+        return new self(http_build_query($params, '', '&', PHP_QUERY_RFC3986));
     }
 
     public function merge(array $parameters): self
     {
-        return new self(http_build_query(array_merge($this->parameters, $parameters)));
+        return new self(http_build_query(array_merge($this->parameters, $parameters), '', '&', PHP_QUERY_RFC3986));
+    }
+
+    /**
+     * Compare deux UrlQueryVO en fonction des paramètres parsés,
+     * pas de la chaîne brute (pour ignorer l'ordre).
+     */
+    public function equals(AbstractValueObject $other): bool
+    {
+        if (! $other instanceof self) {
+            return false;
+        }
+
+        return $this->parameters == $other->parameters;
     }
 
     public function __toString(): string

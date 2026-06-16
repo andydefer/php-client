@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace AndyDefer\PhpHttpClient\Enums;
+namespace AndyDefer\PhpClient\Enums;
 
 enum ContentEncoding: string
 {

@@ -6,12 +6,11 @@ namespace AndyDefer\PhpClient\ValueObjects;
 
 use AndyDefer\DomainStructures\Abstracts\AbstractValueObject;
 use AndyDefer\DomainStructures\Utils\StrictDataObject;
-use AndyDefer\PhpClient\Enums\AcceptLanguage;
 use AndyDefer\PhpClient\Enums\CacheControl;
 use AndyDefer\PhpClient\Enums\ConnectionType;
+use AndyDefer\PhpClient\Enums\ContentEncoding;
 use AndyDefer\PhpClient\Enums\ContentType;
 use AndyDefer\PhpClient\Enums\HeaderType;
-use AndyDefer\PhpHttpClient\Enums\ContentEncoding;
 
 final class HeadersVO extends AbstractValueObject
 {
@@ -39,9 +38,9 @@ final class HeadersVO extends AbstractValueObject
         return $this;
     }
 
-    public function setAcceptLanguage(AcceptLanguage $acceptLanguage): self
+    public function setAcceptLanguage(string $acceptLanguage): self
     {
-        $this->headers[HeaderType::ACCEPT_LANGUAGE->value] = $acceptLanguage->value;
+        $this->headers[HeaderType::ACCEPT_LANGUAGE->value] = $acceptLanguage;
 
         return $this;
     }

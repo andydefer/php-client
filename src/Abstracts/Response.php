@@ -11,15 +11,11 @@ use AndyDefer\PhpClient\ValueObjects\ResponseBodyVO;
 
 abstract class Response implements ResponseInterface
 {
-    private readonly ?Struct $struct;
-
     public function __construct(
         private readonly HttpStatusCode $statusCode,
         private readonly ResponseBodyVO $body,
         private readonly HeadersVO $headers
-    ) {
-        $this->struct = $this->body->getValue();
-    }
+    ) {}
 
     final public function getStatusCode(): HttpStatusCode
     {
@@ -36,11 +32,6 @@ abstract class Response implements ResponseInterface
         return $this->headers;
     }
 
-    final public function getStruct(): ?Struct
-    {
-        return $this->struct;
-    }
-
     public function isSuccess(): bool
     {
         return $this->statusCode->isSuccess();
@@ -49,10 +40,5 @@ abstract class Response implements ResponseInterface
     public function isError(): bool
     {
         return $this->statusCode->isError();
-    }
-
-    public function getData(): mixed
-    {
-        return $this->body->format();
     }
 }

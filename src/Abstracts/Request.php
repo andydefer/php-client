@@ -27,6 +27,11 @@ abstract class Request implements RequestInterface
     {
         $this->headers = new HeadersVO;
         $this->options = new OptionsVO;
+
+        // Initialiser les propriétés en appelant les méthodes abstraites
+        $this->method = $this->setMethod();
+        $this->url = $this->setUrl();
+        $this->body = $this->setBody();
     }
 
     abstract protected function setMethod(): HttpMethod;
