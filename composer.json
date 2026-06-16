@@ -1,0 +1,53 @@
+{
+    "name": "andydefer/php-client",
+    "description": "PSR-7 compliant HTTP client with type-safe request/response handling and SOLID architecture",
+    "type": "library",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "AndyDefer\\PhpClient\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "AndyDefer\\PhpClient\\Tests\\": "tests/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Andy Kani",
+            "email": "andykanidimbu@gmail.com"
+        }
+    ],
+    "require": {
+        "php": "^8.2",
+        "andydefer/domain-structures": "^1.19",
+        "guzzlehttp/guzzle": "^7.11"
+    },
+    "require-dev": {
+        "larastan/larastan": "^3.8",
+        "laravel/pint": "^1.26",
+        "phpunit/phpunit": "^12.5",
+        "rector/rector": "*",
+        "symfony/var-dumper": "^7.0",
+        "vimeo/psalm": "^6.14"
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "sort-packages": true,
+        "allow-plugins": {
+            "phpstan/extension-installer": false,
+            "rector/rector": true
+        }
+    },
+    "scripts": {
+        "test": "phpunit",
+        "test-coverage": "phpunit --coverage-html coverage",
+        "analyse": "phpstan analyse src --level=9 --memory-limit=512M",
+        "cs-fix": "pint",
+        "cs-check": "pint --test",
+        "psalm": "psalm"
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
