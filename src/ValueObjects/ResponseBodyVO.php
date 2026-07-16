@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace AndyDefer\PhpClient\ValueObjects;
 
 use AndyDefer\DomainStructures\Abstracts\AbstractValueObject;
+use AndyDefer\DomainStructures\Normalizers\NormalizerChain;
 use AndyDefer\PhpClient\Abstracts\Struct;
 use AndyDefer\PhpClient\Enums\ContentType;
 use AndyDefer\PhpClient\Enums\Encoding;
@@ -128,10 +129,10 @@ final class ResponseBodyVO extends AbstractValueObject
             try {
                 $result = $this->formatJson();
                 if (is_object($result)) {
-                    return (array) $result;
+                    $result = (array) $result;
                 }
                 if (is_array($result)) {
-                    return $result;
+                    return NormalizerChain::get(true)->normalize($result);
                 }
 
                 return [];
@@ -145,11 +146,11 @@ final class ResponseBodyVO extends AbstractValueObject
         }
 
         if (is_array($this->content)) {
-            return $this->content;
+            return NormalizerChain::get(true)->normalize($this->content);
         }
 
         if (is_object($this->content)) {
-            return (array) $this->content;
+            return NormalizerChain::get(true)->normalize((array) $this->content);
         }
 
         return ['content' => $this->content];
