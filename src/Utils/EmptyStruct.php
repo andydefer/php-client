@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace AndyDefer\PhpPawapay\Structures;
+namespace AndyDefer\PhpClient\Utils;
 
 use AndyDefer\PhpClient\Abstracts\Struct;
 
