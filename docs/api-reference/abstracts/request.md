@@ -9,8 +9,9 @@
 ```
 RequestInterface
     └── Request (abstract)
-            ├── GetPokemonRequest
-            ├── InitiateDepositRequest
+            ├── GetPostsRequest
+            ├── CreatePostRequest
+            ├── GetCommentRequest
             └── ...
 ```
 
@@ -22,9 +23,12 @@ RequestInterface
 
 1. **Encapsulation** de tous les composants d'une requête HTTP
 2. **Configuration** via des méthodes abstraites
-3. **Accès immuable** aux composants
+3. **Accès immuable** aux composants (méthode, URL, corps)
 4. **Mutabilité** des en-têtes et options (via les Value Objects)
-5. **Base** pour toutes les requêtes spécifiques
+5. **Reconstruction dynamique** du corps à chaque appel de `getBody()`
+6. **Base** pour toutes les requêtes spécifiques
+
+---
 
 ## API / Méthodes publiques
 
@@ -40,7 +44,7 @@ Initialise les composants de la requête.
 
 **Exemple :**
 ```php
-$request = new GetPokemonRequest();
+$request = new GetPostsRequest();
 ```
 
 ---
@@ -67,21 +71,21 @@ Retourne l'URL de la requête.
 **Exemple :**
 ```php
 $url = $request->getUrl(); // UrlVO
-echo $url->getValue(); // 'https://api.example.com/v2/pokemon'
+echo $url->getValue(); // 'https://jsonplaceholder.typicode.com/posts'
 ```
 
 ---
 
 ### `getBody(): RequestBodyVO`
 
-Retourne le corps de la requête.
+Retourne le corps de la requête. **Reconstruit le corps à chaque appel** pour garantir que les modifications apportées après la construction soient prises en compte.
 
 **Retourne :** `RequestBodyVO` - Corps de la requête
 
 **Exemple :**
 ```php
 $body = $request->getBody();
-$json = $body->toString(); // '{"depositId":"123"}'
+$json = $body->toString(); // '{"title":"Mon post","body":"...","userId":1}'
 ```
 
 ---
@@ -96,6 +100,7 @@ Retourne les en-têtes de la requête.
 ```php
 $headers = $request->getHeaders();
 $headers->setAuthorization('token');
+$headers->setContentType(ContentType::JSON);
 ```
 
 ---
@@ -110,6 +115,7 @@ Retourne les options de la requête.
 ```php
 $options = $request->getOptions();
 $options->setTimeout(30);
+$options->setConnectTimeout(10);
 ```
 
 ---
@@ -142,7 +148,7 @@ Définit l'URL de la requête.
 ```php
 protected function setUrl(): UrlVO
 {
-    return new UrlVO('https://api.example.com/v2/deposits');
+    return PlaceholderEndpoint::POSTS->getUrl();
 }
 ```
 
@@ -158,7 +164,12 @@ Définit le corps de la requête.
 ```php
 protected function setBody(): RequestBodyVO
 {
-    $struct = new InitiateDepositStruct(...);
+    $struct = new CreatePostStruct(
+        title: $this->title,
+        body: $this->content,
+        userId: $this->userId
+    );
+
     return new RequestBodyVO($struct, ContentType::JSON);
 }
 ```
@@ -167,27 +178,11 @@ protected function setBody(): RequestBodyVO
 
 ## Cas d'utilisation
 
-### Cas 1 : Requête GET vers l'API Pokémon
+### Cas 1 : Requête GET simple
 
 ```php
-final class GetPokemonRequest extends Request
+final class GetPostsRequest extends Request
 {
-    private ?string $pokemonName = null;
-    private ?int $limit = null;
-    private ?int $offset = null;
-
-    public function setPokemonName(string $name): self
-    {
-        $this->pokemonName = $name;
-        return $this;
-    }
-
-    public function setLimit(int $limit): self
-    {
-        $this->limit = $limit;
-        return $this;
-    }
-
     protected function setMethod(): HttpMethod
     {
         return HttpMethod::GET;
@@ -195,53 +190,47 @@ final class GetPokemonRequest extends Request
 
     protected function setUrl(): UrlVO
     {
-        $baseUrl = 'https://pokeapi.co/api/v2/pokemon';
-        
-        if ($this->pokemonName !== null) {
-            return new UrlVO($baseUrl . '/' . $this->pokemonName);
-        }
-
-        $url = $baseUrl;
-        $query = [];
-        if ($this->limit !== null) {
-            $query['limit'] = $this->limit;
-        }
-        if ($this->offset !== null) {
-            $query['offset'] = $this->offset;
-        }
-        if (!empty($query)) {
-            $url .= '?' . http_build_query($query);
-        }
-        
-        return new UrlVO($url);
+        return PlaceholderEndpoint::POSTS->getUrl();
     }
 
     protected function setBody(): RequestBodyVO
     {
-        $struct = new class extends Struct {};
-        return new RequestBodyVO($struct, ContentType::JSON);
+        return new RequestBodyVO(
+            new class extends Struct {},
+            ContentType::JSON
+        );
     }
 }
+
+// Utilisation
+$request = new GetPostsRequest();
+$response = $client->get($request->getUrl()->getValue(), $request, PostListResponse::class);
 ```
 
-### Cas 2 : Requête POST avec corps JSON
+### Cas 2 : Requête POST avec corps dynamique
 
 ```php
-final class InitiateDepositRequest extends Request
+final class CreatePostRequest extends Request
 {
-    private UuidVO $depositId;
-    private AmountVO $amount;
-    private Currency $currency;
+    private string $title = '';
+    private string $content = '';
+    private int $userId = 0;
 
-    public function setDepositId(UuidVO $depositId): self
+    public function setTitle(string $title): self
     {
-        $this->depositId = $depositId;
+        $this->title = $title;
         return $this;
     }
 
-    public function setAmount(AmountVO $amount): self
+    public function setContent(string $content): self
     {
-        $this->amount = $amount;
+        $this->content = $content;
+        return $this;
+    }
+
+    public function setUserId(int $userId): self
+    {
+        $this->userId = $userId;
         return $this;
     }
 
@@ -252,41 +241,52 @@ final class InitiateDepositRequest extends Request
 
     protected function setUrl(): UrlVO
     {
-        return new UrlVO('https://api.sandbox.pawapay.io/v2/deposits');
+        return PlaceholderEndpoint::POSTS->getUrl();
     }
 
     protected function setBody(): RequestBodyVO
     {
-        $struct = new InitiateDepositStruct(
-            depositId: $this->depositId->getValue(),
-            amount: $this->amount->getValue(),
-            currency: $this->currency->value
+        $struct = new CreatePostStruct(
+            title: $this->title,
+            body: $this->content,
+            userId: $this->userId
         );
-        
+
         return new RequestBodyVO($struct, ContentType::JSON);
     }
 }
+
+// Utilisation
+$request = new CreatePostRequest();
+$request
+    ->setTitle('Mon post')
+    ->setContent('Contenu du post')
+    ->setUserId(1);
+
+// Le corps est reconstruit dynamiquement avec les valeurs définies
+$response = $client->post($request->getUrl()->getValue(), $request, CreatePostResponse::class);
 ```
 
 ### Cas 3 : Ajout d'en-têtes et options
 
 ```php
-$request = new InitiateDepositRequest();
+$request = new CreatePostRequest();
 $request
-    ->setDepositId(new UuidVO('...'))
-    ->setAmount(new AmountVO(15.00))
-    ->setCurrency(Currency::ZMW);
+    ->setTitle('Mon post')
+    ->setContent('Contenu du post')
+    ->setUserId(1);
 
 // Ajout des en-têtes
 $request->getHeaders()
-    ->setAuthorization('eyJhbGciOiJIUzI1NiIs...')
     ->setContentType(ContentType::JSON)
-    ->setAccept(ContentType::JSON);
+    ->setAccept(ContentType::JSON)
+    ->setAuthorization('token-123');
 
 // Ajout des options
 $request->getOptions()
     ->setTimeout(30)
-    ->setConnectTimeout(10);
+    ->setConnectTimeout(10)
+    ->setHttpErrors(false);
 ```
 
 ---
@@ -301,14 +301,19 @@ __construct()
     ├── new OptionsVO()
     ├── $this->setMethod() → HttpMethod
     ├── $this->setUrl() → UrlVO
-    └── $this->setBody() → RequestBodyVO
+    └── $this->setBody() → RequestBodyVO (première construction)
     ↓
-getMethod() → HttpMethod
-getUrl() → UrlVO
-getBody() → RequestBodyVO
+getMethod() → HttpMethod (immuable)
+getUrl() → UrlVO (immuable)
 getHeaders() → HeadersVO (modifiable)
 getOptions() → OptionsVO (modifiable)
+    ↓
+getBody() → RequestBodyVO (reconstruit dynamiquement à chaque appel)
+    ├── $this->setBody()
+    └── retourne le nouveau body
 ```
+
+---
 
 ## Gestion des erreurs
 
@@ -316,6 +321,9 @@ getOptions() → OptionsVO (modifiable)
 |-----------|-----------|---------|
 | URL invalide | `InvalidArgumentException` | `Invalid URL: X` |
 | Body invalide | `InvalidArgumentException` | Varie selon le contexte |
+| Options invalides | `InvalidArgumentException` | Varie selon le contexte |
+
+---
 
 ## Intégration
 
@@ -326,37 +334,47 @@ $client = new ClientService();
 $response = $client->post(
     $request->getUrl()->getValue(),
     $request,
-    ResponseClass::class
+    CreatePostResponse::class
 );
 ```
 
-### Avec Guzzle
+### Avec les Value Objects
 
 ```php
-$options = $request->getOptions()->toArray();
-$options['headers'] = $request->getHeaders()->toArray();
-$options['body'] = $request->getBody()->toString();
+// Headers
+$request->getHeaders()
+    ->setContentType(ContentType::JSON)
+    ->setAuthorization('token');
 
-$response = $guzzleClient->request(
-    $request->getMethod()->value,
-    $request->getUrl()->getValue(),
-    $options
-);
+// Options
+$request->getOptions()
+    ->setTimeout(30)
+    ->setConnectTimeout(10);
+
+// Url
+$url = $request->getUrl();
+$baseUrl = $url->getBaseUrl();
+$path = $url->getPath();
+$query = $url->getQuery();
 ```
 
 ### Avec les Structures
 
 ```php
-$request->getBody()->getStruct(); // Struct
-$request->getBody()->toString(); // JSON string
+$struct = $request->getBody()->getStruct(); // Struct
+$json = $request->getBody()->toString(); // JSON string
 ```
+
+---
 
 ## Performance
 
-- Construction en O(1)
-- Les en-têtes et options sont modifiables
-- `getHeaders()` et `getOptions()` retournent des références modifiables
-- Pas de cache
+- **Construction** : O(1)
+- **`getBody()`** : Reconstruit le corps à chaque appel (O(1) - création d'objet)
+- **`getHeaders()` et `getOptions()`** : Retournent des références modifiables
+- **Pas de cache**
+
+---
 
 ## Compatibilité
 
@@ -364,6 +382,8 @@ $request->getBody()->toString(); // JSON string
 |---------|---------|
 | PHP 8.1+ | ✅ Complet |
 | PHP 8.2+ | ✅ Complet |
+
+---
 
 ## Exemple complet
 
@@ -379,7 +399,7 @@ use AndyDefer\PhpClient\Enums\HttpMethod;
 use AndyDefer\PhpClient\ValueObjects\RequestBodyVO;
 use AndyDefer\PhpClient\ValueObjects\UrlVO;
 
-// 1. Créer une requête
+// 1. Définir une requête
 final class CreateUserRequest extends Request
 {
     private string $name;
@@ -428,27 +448,38 @@ $request
 
 // Ajout des en-têtes
 $request->getHeaders()
-    ->setAuthorization('token')
-    ->setContentType(ContentType::JSON);
+    ->setAuthorization('token-xyz')
+    ->setContentType(ContentType::JSON)
+    ->setAccept(ContentType::JSON);
 
 // Ajout des options
-$request->getOptions()->setTimeout(30);
+$request->getOptions()
+    ->setTimeout(30)
+    ->setConnectTimeout(10)
+    ->setHttpErrors(false);
 
 // Accès aux composants
 $method = $request->getMethod(); // HttpMethod::POST
 $url = $request->getUrl(); // UrlVO
-$body = $request->getBody(); // RequestBodyVO
+$body = $request->getBody(); // RequestBodyVO (reconstruit dynamiquement)
 $headers = $request->getHeaders(); // HeadersVO
 $options = $request->getOptions(); // OptionsVO
 
-// Envoi
+// Envoi de la requête
 $client = new ClientService();
 $response = $client->post(
     $url->getValue(),
     $request,
     CreateUserResponse::class
 );
+
+// Traitement de la réponse
+if ($response->isSuccess()) {
+    echo "User created: " . $response->getUserId();
+}
 ```
+
+---
 
 ## Voir aussi
 
@@ -458,4 +489,4 @@ $response = $client->post(
 - `OptionsVO` - Options HTTP
 - `UrlVO` - URL
 - `HttpMethod` - Enum des méthodes HTTP
----
+- `ClientService` - Client HTTP

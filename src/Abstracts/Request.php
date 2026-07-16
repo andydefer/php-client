@@ -28,7 +28,6 @@ abstract class Request implements RequestInterface
         $this->headers = new HeadersVO;
         $this->options = new OptionsVO;
 
-        // Initialiser les propriétés en appelant les méthodes abstraites
         $this->method = $this->setMethod();
         $this->url = $this->setUrl();
         $this->body = $this->setBody();
@@ -52,6 +51,9 @@ abstract class Request implements RequestInterface
 
     final public function getBody(): RequestBodyVO
     {
+        // ✅ Reconstruit le body à chaque appel
+        $this->body = $this->setBody();
+
         return $this->body;
     }
 

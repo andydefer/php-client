@@ -2,7 +2,7 @@
 
 ## Description
 
-`ClientService` est un client HTTP qui implémente l'interface `ClientInterface`. Il encapsule GuzzleHttp pour envoyer des requêtes HTTP et retourner des réponses typées. Il gère la construction des options, l'hydratation des corps de réponse et la gestion des erreurs.
+`ClientService` est le client HTTP principal du package. Il envoie des requêtes HTTP via Guzzle et retourne des réponses typées. Il gère l'hydratation automatique des réponses en structures PHP typées.
 
 ## Hiérarchie
 
@@ -11,31 +11,40 @@ ClientInterface
     └── ClientService
 ```
 
-**Dépendance :** `GuzzleHttp\Client`
+**Implémente :** `ClientInterface`
 
 ## Rôle principal
 
 `ClientService` assure :
 
 1. **Envoi** de requêtes HTTP (GET, POST, PUT, PATCH, DELETE)
-2. **Construction** des options (headers, body, timeouts)
-3. **Hydratation** automatique des réponses en `Response`
-4. **Gestion** des erreurs HTTP et Guzzle
-5. **Typage** générique des réponses
+2. **Hydratation** automatique des réponses en objets PHP typés
+3. **Gestion** des headers, body et options
+4. **Validation** des codes de statut HTTP
+5. **Traitement** des erreurs Guzzle
+6. **Généricité** via les templates PHP (`@template`)
+
+---
 
 ## API / Méthodes publiques
 
 ### `__construct(?GuzzleClient $client = null)`
 
+Initialise le client HTTP.
+
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$client` | `?GuzzleClient` | Instance de Guzzle (défaut : nouvelle instance) |
+| `$client` | `GuzzleClient|null` | Client Guzzle personnalisé (optionnel) |
+
+**Exceptions :** Aucune
 
 **Exemple :**
 ```php
 $client = new ClientService();
-// ou avec une instance Guzzle personnalisée
-$client = new ClientService(new GuzzleClient(['timeout' => 60]));
+
+// Avec Guzzle personnalisé
+$guzzle = new GuzzleClient(['base_uri' => 'https://api.example.com']);
+$client = new ClientService($guzzle);
 ```
 
 ---
@@ -46,20 +55,22 @@ Envoie une requête GET.
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$uri` | `string` | URI de la requête |
-| `$request` | `Request` | Objet requête |
-| `$responseClass` | `class-string<TResponse>` | Classe de la réponse |
+| `$uri` | `string` | URI de la requête (absolue ou relative) |
+| `$request` | `Request` | Instance de la requête |
+| `$responseClass` | `class-string<Response>` | Classe de réponse attendue |
 
-**Retourne :** `TResponse` - Réponse typée
+**Retourne :** `Response` - Réponse typée
 
-**Exceptions :** `RuntimeException` si la requête échoue
+**Exceptions :** 
+- `RuntimeException` si la requête Guzzle échoue
+- `InvalidArgumentException` si la réponse est invalide
 
 **Exemple :**
 ```php
 $response = $client->get(
-    'https://api.example.com/users',
+    'https://api.example.com/posts',
     $request,
-    UserListResponse::class
+    PostListResponse::class
 );
 ```
 
@@ -72,19 +83,21 @@ Envoie une requête POST.
 | Paramètre | Type | Description |
 |-----------|------|-------------|
 | `$uri` | `string` | URI de la requête |
-| `$request` | `Request` | Objet requête |
-| `$responseClass` | `class-string<TResponse>` | Classe de la réponse |
+| `$request` | `Request` | Instance de la requête |
+| `$responseClass` | `class-string<Response>` | Classe de réponse attendue |
 
-**Retourne :** `TResponse` - Réponse typée
+**Retourne :** `Response` - Réponse typée
 
-**Exceptions :** `RuntimeException` si la requête échoue
+**Exceptions :** 
+- `RuntimeException` si la requête Guzzle échoue
+- `InvalidArgumentException` si la réponse est invalide
 
 **Exemple :**
 ```php
 $response = $client->post(
-    'https://api.example.com/users',
+    'https://api.example.com/posts',
     $request,
-    CreateUserResponse::class
+    CreatePostResponse::class
 );
 ```
 
@@ -97,21 +110,10 @@ Envoie une requête PUT.
 | Paramètre | Type | Description |
 |-----------|------|-------------|
 | `$uri` | `string` | URI de la requête |
-| `$request` | `Request` | Objet requête |
-| `$responseClass` | `class-string<TResponse>` | Classe de la réponse |
+| `$request` | `Request` | Instance de la requête |
+| `$responseClass` | `class-string<Response>` | Classe de réponse attendue |
 
-**Retourne :** `TResponse` - Réponse typée
-
-**Exceptions :** `RuntimeException` si la requête échoue
-
-**Exemple :**
-```php
-$response = $client->put(
-    'https://api.example.com/users/1',
-    $request,
-    UpdateUserResponse::class
-);
-```
+**Retourne :** `Response` - Réponse typée
 
 ---
 
@@ -122,21 +124,10 @@ Envoie une requête PATCH.
 | Paramètre | Type | Description |
 |-----------|------|-------------|
 | `$uri` | `string` | URI de la requête |
-| `$request` | `Request` | Objet requête |
-| `$responseClass` | `class-string<TResponse>` | Classe de la réponse |
+| `$request` | `Request` | Instance de la requête |
+| `$responseClass` | `class-string<Response>` | Classe de réponse attendue |
 
-**Retourne :** `TResponse` - Réponse typée
-
-**Exceptions :** `RuntimeException` si la requête échoue
-
-**Exemple :**
-```php
-$response = $client->patch(
-    'https://api.example.com/users/1',
-    $request,
-    PatchUserResponse::class
-);
-```
+**Retourne :** `Response` - Réponse typée
 
 ---
 
@@ -147,75 +138,123 @@ Envoie une requête DELETE.
 | Paramètre | Type | Description |
 |-----------|------|-------------|
 | `$uri` | `string` | URI de la requête |
-| `$request` | `Request` | Objet requête |
-| `$responseClass` | `class-string<TResponse>` | Classe de la réponse |
+| `$request` | `Request` | Instance de la requête |
+| `$responseClass` | `class-string<Response>` | Classe de réponse attendue |
 
-**Retourne :** `TResponse` - Réponse typée
+**Retourne :** `Response` - Réponse typée
 
-**Exceptions :** `RuntimeException` si la requête échoue
+---
 
-**Exemple :**
-```php
-$response = $client->delete(
-    'https://api.example.com/users/1',
-    $request,
-    DeleteUserResponse::class
-);
-```
+## Méthodes privées
+
+### `send(HttpMethod $method, string $uri, Request $request, string $responseClass): Response`
+
+Envoie la requête HTTP et hydrate la réponse.
+
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| `$method` | `HttpMethod` | Méthode HTTP |
+| `$uri` | `string` | URI de la requête |
+| `$request` | `Request` | Instance de la requête |
+| `$responseClass` | `class-string<Response>` | Classe de réponse attendue |
+
+**Retourne :** `Response` - Réponse typée
+
+**Exceptions :** `RuntimeException` si la requête Guzzle échoue
+
+---
+
+### `buildOptions(Request $request): array`
+
+Construit les options pour Guzzle.
+
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| `$request` | `Request` | Instance de la requête |
+
+**Retourne :** `array` - Options Guzzle
+
+---
+
+### `getStructClassFromResponse(string $responseClass): ?string`
+
+Récupère la classe Struct associée à la réponse.
+
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| `$responseClass` | `class-string<Response>` | Classe de réponse |
+
+**Retourne :** `string|null` - Classe Struct ou null
 
 ---
 
 ## Cas d'utilisation
 
-### Cas 1 : Requête GET avec headers personnalisés
+### Cas 1 : Requête GET avec headers
 
 ```php
-$request = new GetPokemonRequest();
-$request->setLimit(20);
+$client = new ClientService();
+
+$request = new GetPostsRequest();
 $request->getHeaders()
-    ->setAccept(ContentType::JSON)
-    ->setAuthorization('token123');
+    ->setAuthorization('token-123')
+    ->setAccept(ContentType::JSON);
 
 $response = $client->get(
-    'https://pokeapi.co/api/v2/pokemon',
+    'https://api.example.com/posts',
     $request,
-    PokemonListResponse::class
+    PostListResponse::class
 );
 
 if ($response->isSuccess()) {
-    $pokemons = $response->getPokemons();
+    $posts = $response->getPosts();
 }
 ```
 
 ### Cas 2 : Requête POST avec corps JSON
 
 ```php
-$request = new CreateUserRequest();
-$request->setName('John Doe')->setEmail('john@example.com');
+$client = new ClientService();
+
+$request = new CreatePostRequest();
+$request
+    ->setTitle('Mon post')
+    ->setContent('Contenu du post')
+    ->setUserId(1);
+
+$request->getHeaders()
+    ->setContentType(ContentType::JSON)
+    ->setAccept(ContentType::JSON);
 
 $response = $client->post(
-    'https://api.example.com/users',
+    'https://api.example.com/posts',
     $request,
-    CreateUserResponse::class
+    CreatePostResponse::class
 );
 
 if ($response->isSuccess()) {
-    $userId = $response->getUserId();
+    $created = $response->getCreatedPost();
+    echo "Post créé avec ID: " . $created->id;
 }
 ```
 
-### Cas 3 : Gestion des erreurs
+### Cas 3 : Requête avec options personnalisées
 
 ```php
-try {
-    $response = $client->get(
-        'https://api.example.com/unknown',
-        $request,
-        ErrorResponse::class
-    );
-} catch (RuntimeException $e) {
-    echo 'HTTP request failed: ' . $e->getMessage();
-}
+$client = new ClientService();
+
+$request = new GetPostsRequest();
+$request->getOptions()
+    ->setTimeout(30)
+    ->setConnectTimeout(10)
+    ->setHttpErrors(false)
+    ->setVerify(true);
+
+$response = $client->get(
+    'https://api.example.com/posts',
+    $request,
+    PostListResponse::class
+);
 ```
 
 ---
@@ -225,66 +264,92 @@ try {
 ```
 ClientService::get/post/put/patch/delete()
     ↓
-send(HttpMethod, $uri, $request, $responseClass)
+send()
     ↓
-buildOptions($request)
-    ├── headers → $options['headers']
-    ├── body → $options['body'] (si non vide)
-    └── options → array_merge($options, $request->getOptions())
+buildOptions()
+    ├── Headers → $options['headers']
+    ├── Body → $options['body'] (si non vide)
+    └── Options → array_merge()
     ↓
-GuzzleClient::request($method, $uri, $options)
+Guzzle::request()
+    ├── Succès → Continue
+    └── Erreur → RuntimeException
     ↓
-    ├── Succès → GuzzleResponse
-    │   ↓
-    │   HttpStatusCode::tryFrom()
-    │   ↓
-    │   new ResponseBodyVO($content, $structClass, $contentType)
-    │   ↓
-    │   new $responseClass($statusCode, $body, $headers)
-    │
-    └── GuzzleException → RuntimeException
+ResponseBodyVO
+    ├── content → Guzzle response body
+    ├── contentType → Request body contentType
+    └── structClass → getStructClassFromResponse()
+    ↓
+new $responseClass($statusCode, $body, $headers)
+    ↓
+Retourne la réponse typée
 ```
+
+---
 
 ## Gestion des erreurs
 
 | Situation | Exception | Message |
 |-----------|-----------|---------|
 | Erreur Guzzle | `RuntimeException` | `HTTP request failed: X` |
-| Réponse invalide | `InvalidArgumentException` | Varie selon `ResponseBodyVO` |
+| URL invalide | `InvalidArgumentException` | `Invalid URL: X` |
+| JSON invalide | `InvalidArgumentException` | `Invalid JSON: X` |
 | Classe de réponse invalide | `TypeError` | - |
+
+---
 
 ## Intégration
 
 ### Avec Request
 
 ```php
-$request = new GetPokemonRequest();
+$request = new GetPostsRequest();
 $request->getHeaders()->setAuthorization('token');
+$request->getOptions()->setTimeout(30);
+
+$response = $client->get($uri, $request, ResponseClass::class);
 ```
 
 ### Avec Response
 
 ```php
-$response = $client->get($uri, $request, PokemonListResponse::class);
-$pokemons = $response->getPokemons();
+$response = $client->get($uri, $request, PostListResponse::class);
+
+if ($response->isSuccess()) {
+    $data = $response->getPosts();
+} else {
+    $status = $response->getStatusCode();
+}
 ```
 
-### Avec Guzzle
+### Avec les Value Objects
 
 ```php
-// ClientService utilise Guzzle en interne
-$client = new ClientService(new GuzzleClient([
-    'base_uri' => 'https://api.example.com',
-    'timeout' => 30
-]));
+// Headers
+$request->getHeaders()
+    ->setContentType(ContentType::JSON)
+    ->setAccept(ContentType::JSON);
+
+// Options
+$request->getOptions()
+    ->setTimeout(30)
+    ->setConnectTimeout(10);
+
+// Body
+$body = $request->getBody();
+$json = $body->toString();
 ```
+
+---
 
 ## Performance
 
-- Encapsulation légère de Guzzle
-- Pas de cache interne
-- `buildOptions()` O(1)
-- Hydratation des réponses O(n) pour les collections
+- **Envoi** : Délégation à Guzzle (performant)
+- **Hydratation** : O(1) par paramètre
+- **Options** : Construction à chaque requête
+- **Pas de cache**
+
+---
 
 ## Compatibilité
 
@@ -292,7 +357,8 @@ $client = new ClientService(new GuzzleClient([
 |---------|---------|
 | PHP 8.1+ | ✅ Complet |
 | PHP 8.2+ | ✅ Complet |
-| Guzzle 7+ | ✅ Complet |
+
+---
 
 ## Exemple complet
 
@@ -303,60 +369,47 @@ declare(strict_types=1);
 
 use AndyDefer\PhpClient\Clients\ClientService;
 use AndyDefer\PhpClient\Enums\ContentType;
-use AndyDefer\PhpClient\Enums\HttpStatusCode;
 
 // 1. Créer le client
 $client = new ClientService();
 
-// 2. Créer la requête
-$request = new GetPokemonRequest();
+// 2. Configurer la requête
+$request = new CreatePostRequest();
 $request
-    ->setLimit(20)
-    ->getHeaders()
+    ->setTitle('Mon post')
+    ->setContent('Contenu du post')
+    ->setUserId(1);
+
+$request->getHeaders()
+    ->setContentType(ContentType::JSON)
     ->setAccept(ContentType::JSON)
-    ->setAuthorization('your-token');
+    ->setAuthorization('token-123');
 
 $request->getOptions()
     ->setTimeout(30)
-    ->setConnectTimeout(10);
+    ->setConnectTimeout(10)
+    ->setHttpErrors(false);
 
 // 3. Envoyer la requête
-$response = $client->get(
-    'https://pokeapi.co/api/v2/pokemon',
+$response = $client->post(
+    'https://jsonplaceholder.typicode.com/posts',
     $request,
-    PokemonListResponse::class
+    CreatePostResponse::class
 );
 
 // 4. Traiter la réponse
 if ($response->isSuccess()) {
-    $pokemons = $response->getPokemons();
-    $count = $response->getCount();
-    echo "Found {$count} Pokémon\n";
-    
-    foreach ($pokemons as $pokemon) {
-        echo "- {$pokemon->name}\n";
-    }
+    $post = $response->getCreatedPost();
+    echo "Post créé !\n";
+    echo "ID: " . $post->id . "\n";
+    echo "Titre: " . $post->title . "\n";
+    echo "User ID: " . $post->user_id . "\n";
 } else {
-    echo "Error: " . $response->getStatusCode()->value;
-}
-
-// 5. Requête POST
-$createRequest = new CreateUserRequest();
-$createRequest
-    ->setName('John Doe')
-    ->setEmail('john@example.com')
-    ->getHeaders()->setContentType(ContentType::JSON);
-
-$createResponse = $client->post(
-    'https://api.example.com/users',
-    $createRequest,
-    CreateUserResponse::class
-);
-
-if ($createResponse->isSuccess()) {
-    echo "User created: " . $createResponse->getUserId();
+    echo "Erreur: " . $response->getStatusCode()->getPhrase() . "\n";
 }
 ```
+
+---
 
 ## Voir aussi
 
@@ -365,6 +418,5 @@ if ($createResponse->isSuccess()) {
 - `HeadersVO` - En-têtes HTTP
 - `OptionsVO` - Options HTTP
 - `ResponseBodyVO` - Corps de réponse
-- `HttpMethod` - Enum des méthodes HTTP
 - `HttpStatusCode` - Enum des codes de statut
----
+- `GuzzleClient` - Client Guzzle sous-jacent

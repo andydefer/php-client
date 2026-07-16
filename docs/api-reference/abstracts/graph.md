@@ -2,16 +2,19 @@
 
 ## Description
 
-Un `Graph` est une portion de structure de réponse API. Il représente un sous-ensemble de données retournées par une API, servant à documenter et structurer les fragments d'une réponse JSON. Contrairement aux `Record`, les `Graph` peuvent contenir des Value Objects et des Enums qui sont automatiquement convertis lors de l'hydratation.
+`Graph` est une classe abstraite qui représente une **portion** de structure de réponse API. Elle sert à documenter et structurer les fragments d'une réponse JSON. Contrairement aux `Record`, les `Graph` peuvent contenir des Value Objects et des Enums qui sont automatiquement convertis lors de l'hydratation.
 
 ## Hiérarchie
 
 ```
 AbstractRecord
-    └── Graph
+    └── HydratableStructure (conversion automatique)
+            └── Graph
+                    ├── PokemonGraph
+                    ├── TypeGraph
+                    ├── CommentGraph
+                    └── ...
 ```
-
-**Implémente :** `Transformable`
 
 ## Rôle principal
 
@@ -22,12 +25,39 @@ Les `Graph` servent à :
 3. **Typer** les portions de données retournées par l'API
 4. **Convertir automatiquement** les données brutes (strings) en Value Objects et Enums
 5. **Assurer l'immutabilité** des données
+6. **Conserver la casse originale** des clés (contrairement aux Record qui utilisent snake_case)
 
-> ⚠️ **Un `Graph` est une portion de la structure d'une réponse.** Il représente un sous-ensemble de données, pas la réponse complète, les value objects ne doivent pas y servir pour la validation mais pour le formatage.
+> ⚠️ **Différence avec Struct :** Un `Graph` est une **portion** de la structure d'une réponse, alors qu'une `Struct` est la structure **complète**. Une `Struct` peut contenir des `Graph`.
+
+---
 
 ## API / Méthodes publiques
 
+### `normalizeKey(string $key): string`
+
+Préserve la casse originale des clés.
+
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| `$key` | `string` | Clé à normaliser |
+
+**Retourne :** `string` - La clé inchangée (casse préservée)
+
+**Exemple :**
+```php
+// ⚠️ La méthode est protected, pas d'usage direct
+// L'effet est visible lors de l'hydratation
+$pokemon = PokemonGraph::from([
+    'pokemonName' => 'Pikachu'  // ← Clé en camelCase
+]);
+echo $pokemon->pokemonName; // 'Pikachu' (préservé)
+```
+
+---
+
 ### `toArray(): array`
+
+Normalise le Graph en tableau.
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
@@ -46,15 +76,17 @@ $array = $type->toArray();
 
 ### `getValue(): static`
 
+Retourne l'instance elle-même.
+
 | Paramètre | Type | Description |
 |-----------|------|-------------|
 | - | - | - |
 
-**Retourne :** `static` - L'instance elle-même (retourne `$this`)
+**Retourne :** `static` - L'instance elle-même
 
 **Exemple :**
 ```php
-$type = new TypeGraph('grass', 'https://pokeapi.co/api/v2/type/12/');
+$type = new TypeGraph('grass', 'https://...');
 $value = $type->getValue(); // $value === $type
 ```
 
@@ -70,16 +102,18 @@ Crée une instance à partir d'une source. **Convertit automatiquement** les str
 
 **Retourne :** `static` - Instance du Graph
 
-**Exceptions :** `InvalidArgumentException` si la source est invalide ou si des paramètres requis sont manquants
+**Exceptions :** 
+- `InvalidArgumentException` si la source n'est pas un tableau ou objet
+- `InvalidArgumentException` si des paramètres requis sont manquants
 
 **Exemple :**
 ```php
 // Conversion automatique string → Value Object
 $pokemon = PokemonDetailGraph::from([
-    'id' => 'pikachu-001',        // → PokemonId
-    'name' => 'Pikachu',          // → PokemonName
-    'height' => 4,                // → PokemonHeight
-    'weight' => 60,               // → PokemonWeight
+    'id' => 'pikachu-001',        // → PokemonId (Value Object)
+    'name' => 'Pikachu',          // → PokemonName (Value Object)
+    'height' => 4,                // → PokemonHeight (Value Object)
+    'weight' => 60,               // → PokemonWeight (Value Object)
     'status' => 'active',         // → PokemonStatus (Enum)
 ]);
 ```
@@ -132,7 +166,7 @@ $collection = TypeGraph::collect($data, TypeCollection::class);
 
 ## Cas d'utilisation
 
-### Cas 1 : Représenter une partie de réponse API
+### Cas 1 : Représenter une portion de réponse API
 
 ```php
 // Graph représentant un Type Pokémon
@@ -141,18 +175,21 @@ final class TypeGraph extends Graph
     public function __construct(
         public readonly string $name,
         public readonly string $url,
+        public readonly ?string $full_name = 'Andy'
     ) {}
 }
 
-// Utilisation dans une réponse
-$types = new TypeCollection();
-$types->add(
-    new TypeGraph('grass', 'https://pokeapi.co/api/v2/type/12/'),
-    new TypeGraph('poison', 'https://pokeapi.co/api/v2/type/4/')
-);
+// Utilisation dans une Struct
+final class PokemonListStruct extends Struct
+{
+    public function __construct(
+        public readonly int $count,
+        public readonly PokemonCollection $results,  // Collection de Graph
+    ) {}
+}
 ```
 
-### Cas 2 : Fragmenter une réponse complexe avec Value Objects
+### Cas 2 : Graph avec Value Objects et Enums
 
 ```php
 // Graph avec Value Objects et Enums
@@ -179,29 +216,27 @@ $pokemon = PokemonDetailGraph::from([
 ]);
 ```
 
-### Cas 3 : Surcharge de `from()` pour formater
+### Cas 3 : Préservation de la casse
 
 ```php
-final class StatGraph extends Graph
+final class WeatherGraph extends Graph
 {
     public function __construct(
-        public readonly string $name,
-        public readonly int $base_stat,
+        public readonly string $cityName,      // camelCase
+        public readonly float $temperatureC,   // camelCase
+        public readonly float $humidityPct,    // camelCase
     ) {}
-
-    // Surcharge pour transformer les données de l'API
-    public static function from(mixed $source): static
-    {
-        $data = is_array($source) ? $source : (array) $source;
-        
-        // Formatage : conversion de clé
-        if (isset($data['base_stat'])) {
-            $data['base_stat'] = (int) $data['base_stat'];
-        }
-        
-        return parent::from($data);
-    }
 }
+
+// Les clés en camelCase sont préservées
+$weather = WeatherGraph::from([
+    'cityName' => 'Paris',        // ✓ Préservé
+    'temperatureC' => 22.5,       // ✓ Préservé
+    'humidityPct' => 65.0,        // ✓ Préservé
+    'CityName' => 'Lyon',         // ✗ Ignoré (casse différente)
+]);
+
+echo $weather->cityName; // 'Paris' (pas 'Lyon')
 ```
 
 ---
@@ -211,33 +246,44 @@ final class StatGraph extends Graph
 ```
 Source (API) → from() / fromJson()
     ↓
-Analyse du constructeur
+Analyse du constructeur (casse préservée)
     ↓
 Pour chaque paramètre :
     1. Vérifier la présence de la clé (CASSE SENSITIVE)
     2. Si présente → convertir la valeur vers le type attendu
     3. Si absente → utiliser la valeur par défaut ou null
     ↓
+Conversion automatique :
+    ├── string → Value Object (via from())
+    ├── string → Enum (via from())
+    ├── array → Graph (via from())
+    ├── array → Collection (hydratation récursive)
+    └── scalar → type natif
+    ↓
 new static(...$parameters)
     ↓
 Instance Graph (immutable)
 ```
 
+---
+
 ## Gestion des erreurs
 
 | Situation | Exception | Message |
 |-----------|-----------|---------|
-| Source n'est pas un tableau ou objet | `InvalidArgumentException` | `Source must be an array or object, X given` |
+| Source non tableau/objet | `InvalidArgumentException` | `Source must be an array or object, X given` |
 | Paramètre requis manquant | `InvalidArgumentException` | `Missing required parameters for X: $Y, $Z. Available keys: ...` |
 | JSON invalide | `InvalidArgumentException` | `Invalid JSON: X` |
 | Conversion impossible | `InvalidArgumentException` | `Cannot convert value to X` |
+
+---
 
 ## Intégration
 
 ### Avec les Structures
 
 ```php
-// Structure complète utilisant des Graphs
+// Struct contenant des Graphs
 final class PokemonListStruct extends Struct
 {
     public function __construct(
@@ -250,20 +296,42 @@ final class PokemonListStruct extends Struct
 ### Avec ResponseBodyVO
 
 ```php
-// Hydratation automatique vers une Structure contenant des Graphs
+// Hydratation automatique vers une Struct contenant des Graphs
 $body = new ResponseBodyVO(
     content: $responseBody,
     structClass: PokemonListStruct::class,
     contentType: ContentType::JSON
 );
+
+$struct = $body->getValue();  // PokemonListStruct avec Graphs
 ```
+
+### Avec les Collections
+
+```php
+// Collection de Graphs
+final class PokemonCollection extends AbstractTypedCollection
+{
+    public function __construct()
+    {
+        parent::__construct(PokemonGraph::class);
+    }
+}
+
+// Utilisation
+$collection = PokemonGraph::collect($data, PokemonCollection::class);
+```
+
+---
 
 ## Performance
 
-- La normalisation utilise le `NormalizerChain` avec des normaliseurs optimisés
-- Conversion automatique des Value Objects et Enums en O(1)
-- Pas de validation lourde (contrairement aux Value Objects)
-- Conversion O(n) pour les collections
+- **Hydratation** : O(1) par paramètre
+- **Collections** : O(n) où n est le nombre d'éléments
+- **Normalisation** : Utilise `NormalizerChain` optimisé
+- **Conversion** : Fonctions natives (`enum_exists`, `is_subclass_of`, etc.)
+
+---
 
 ## Compatibilité
 
@@ -271,6 +339,8 @@ $body = new ResponseBodyVO(
 |---------|---------|
 | PHP 8.1+ | ✅ Complet |
 | PHP 8.2+ | ✅ Complet |
+
+---
 
 ## Exemple complet
 
@@ -280,21 +350,40 @@ $body = new ResponseBodyVO(
 declare(strict_types=1);
 
 use AndyDefer\PhpClient\Abstracts\Graph;
-use AndyDefer\PhpClient\Tests\Fixtures\Pokemon\Graphs\TypeGraph;
-use AndyDefer\PhpClient\Tests\Fixtures\Pokemon\Graphs\PokemonDetailGraph;
-use AndyDefer\PhpClient\Tests\Fixtures\Pokemon\Collections\TypeCollection;
 
-// 1. Créer un Graph simple
+// 1. Définir un Graph simple
+final class TypeGraph extends Graph
+{
+    public function __construct(
+        public readonly string $name,
+        public readonly string $url,
+    ) {}
+}
+
+// 2. Définir un Graph avec Value Objects
+final class PokemonDetailGraph extends Graph
+{
+    public function __construct(
+        public readonly PokemonId $id,
+        public readonly PokemonName $name,
+        public readonly PokemonHeight $height,
+        public readonly PokemonWeight $weight,
+        public readonly TypeCollection $types,
+        public readonly PokemonStatus $status,
+    ) {}
+}
+
+// 3. Hydratation depuis un tableau
 $type = TypeGraph::from([
     'name' => 'grass',
     'url' => 'https://pokeapi.co/api/v2/type/12/'
 ]);
 
-// 2. Créer un Graph depuis JSON
+// 4. Hydratation depuis JSON
 $json = '{"name":"bulbasaur","url":"https://pokeapi.co/api/v2/pokemon/1/"}';
 $pokemon = PokemonGraph::fromJson($json);
 
-// 3. Créer un Graph complexe avec Value Objects
+// 5. Hydratation complexe avec Value Objects
 $pokemonDetail = PokemonDetailGraph::from([
     'id' => 'pikachu-001',
     'name' => 'Pikachu',
@@ -306,7 +395,7 @@ $pokemonDetail = PokemonDetailGraph::from([
     'status' => 'active'
 ]);
 
-// 4. Normalisation
+// 6. Normalisation
 $normalized = $pokemonDetail->toArray();
 // [
 //     'id' => 'pikachu-001',
@@ -319,18 +408,25 @@ $normalized = $pokemonDetail->toArray();
 //     'status' => 'active'
 // ]
 
-// 5. Collection de Graphs
+// 7. Collection de Graphs
 $data = [
     ['name' => 'grass', 'url' => '...'],
     ['name' => 'poison', 'url' => '...']
 ];
 $collection = TypeGraph::collect($data, TypeCollection::class);
+
+// 8. Accès aux données
+foreach ($collection as $type) {
+    echo $type->name;  // 'grass', 'poison'
+}
 ```
+
+---
 
 ## Voir aussi
 
 - `Struct` - Structure complète de réponse API
-- `AbstractRecord` - Classe parente des Graph
-- `AbstractValueObject` - Value Objects pour les données métier
-- `NormalizerChain` - Système de normalisation
----
+- `HydratableStructure` - Classe parente avec logique de conversion
+- `AbstractRecord` - Classe de base des structures de données
+- `ResponseBodyVO` - Value Object pour le corps de réponse HTTP
+- `ContentType` - Enum des types de contenu supportés

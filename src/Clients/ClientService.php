@@ -119,19 +119,17 @@ final class ClientService implements ClientInterface
     {
         $options = [];
 
-        // Headers
         $headers = $request->getHeaders()->toArray();
         if (! empty($headers)) {
             $options['headers'] = $headers;
         }
 
-        // Body
         $body = $request->getBody();
+
         if (! $body->isEmpty()) {
             $options['body'] = $body->toString();
         }
 
-        // Options
         $options = array_merge($options, $request->getOptions()->toArray());
 
         return $options;

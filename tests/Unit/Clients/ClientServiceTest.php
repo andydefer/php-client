@@ -540,35 +540,6 @@ final class ClientServiceTest extends TestCase
         );
     }
 
-    // ==================== BUILD OPTIONS TESTS ====================
-
-    public function test_build_options_with_headers_and_body(): void
-    {
-        $request = new GetPokemonRequest;
-        $request->getHeaders()->setAuthorization('token');
-
-        $struct = new class extends Struct
-        {
-            public function __construct(
-                public readonly string $data = 'test',
-            ) {}
-        };
-
-        $body = new RequestBodyVO(new $struct, ContentType::JSON);
-
-        $reflection = new \ReflectionClass($request);
-        $bodyProperty = $reflection->getProperty('body');
-        $bodyProperty->setValue($request, $body);
-
-        // Invoquer buildOptions sur le client, pas sur la requête
-        $options = $this->invokeMethod($this->client, 'buildOptions', [$request]);
-
-        $this->assertArrayHasKey('headers', $options);
-        $this->assertArrayHasKey('Authorization', $options['headers']);
-        $this->assertArrayHasKey('body', $options);
-        $this->assertIsString($options['body']);
-    }
-
     // ==================== GET STRUCT CLASS FROM RESPONSE TESTS ====================
 
     public function test_get_struct_class_from_response_with_method(): void

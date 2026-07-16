@@ -12,6 +12,7 @@ AbstractRecord
             └── Struct (encode/decode)
                     ├── PokemonListStruct
                     ├── PokemonDetailStruct
+                    ├── CommentListStruct
                     └── ...
 ```
 
@@ -27,9 +28,13 @@ Les `Struct` servent à :
 
 > ⚠️ **Différence avec Graph :** Une `Struct` est une structure **complète** de réponse API, alors qu'un `Graph` est une **portion** de réponse. Une `Struct` peut contenir des `Graph`.
 
+---
+
 ## API / Méthodes publiques
 
 ### `toArray(): array`
+
+Normalise la structure en tableau.
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
@@ -46,6 +51,8 @@ $array = $struct->toArray();
 ---
 
 ### `getValue(): static`
+
+Retourne l'instance elle-même.
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
@@ -240,6 +247,8 @@ encode() → JSON / FORM
 toArray() → Tableau normalisé
 ```
 
+---
+
 ## Subtilités importantes
 
 ### Subtilité 1 : `decode()` vs `fromJson()`
@@ -296,15 +305,19 @@ echo $struct->data->id->getValue();    // 'pikachu-001'
 echo $struct->data->status->value;     // 'active'
 ```
 
+---
+
 ## Gestion des erreurs
 
 | Situation | Exception | Message |
 |-----------|-----------|---------|
-| Source n'est pas un tableau ou objet | `InvalidArgumentException` | `Source must be an array or object, X given` |
+| Source non tableau/objet | `InvalidArgumentException` | `Source must be an array or object, X given` |
 | Paramètre requis manquant | `InvalidArgumentException` | `Missing required parameters for X: $Y, $Z. Available keys: ...` |
 | JSON invalide (decode/fromJson) | `InvalidArgumentException` | `Invalid JSON: X` |
 | Type de contenu non supporté (encode) | `InvalidArgumentException` | `Unsupported content type for encoding: X` |
 | Classe ne correspond pas à une Struct (decode) | `InvalidArgumentException` | `Class X must extend Y` |
+
+---
 
 ## Intégration
 
@@ -336,24 +349,32 @@ $struct = $body->getValue();  // PokemonListStruct
 ### Avec le Client
 
 ```php
-// Envoi d'une Struct en JSON
-$request = new InitiateDepositRequest();
-$struct = $request->getBody()->getStruct();
+// Utilisation dans une Response
+final class PokemonListResponse extends Response
+{
+    public function getPokemons(): PokemonCollection
+    {
+        return $this->getBody()->getValue()->results;  // Struct → Graph
+    }
 
-$json = $struct->encode(ContentType::JSON);
-$client->post('/v2/deposits', [
-    'body' => $json,
-    'headers' => ['Content-Type' => 'application/json']
-]);
+    public static function getStructClass(): string
+    {
+        return PokemonListStruct::class;  // Classe Struct associée
+    }
+}
 ```
+
+---
 
 ## Performance
 
-- `toArray()` utilise `NormalizerChain` pour la normalisation récursive
-- `encode()` utilise `json_encode()` natif (performant)
-- `decode()` utilise `json_decode()` natif (performant)
-- Conversion des types via `convertValue()` en O(1) par paramètre
-- Collections hydratées en O(n)
+- **Hydratation** : O(1) par paramètre
+- **`toArray()`** : Utilise `NormalizerChain` optimisé
+- **`encode()`** : Utilise `json_encode()` natif (performant)
+- **`decode()`** : Utilise `json_decode()` natif (performant)
+- **Conversion** : Fonctions natives (`enum_exists`, `is_subclass_of`, etc.)
+
+---
 
 ## Compatibilité
 
@@ -361,6 +382,8 @@ $client->post('/v2/deposits', [
 |---------|---------|
 | PHP 8.1+ | ✅ Complet |
 | PHP 8.2+ | ✅ Complet |
+
+---
 
 ## Exemple complet
 
@@ -371,10 +394,19 @@ declare(strict_types=1);
 
 use AndyDefer\PhpClient\Abstracts\Struct;
 use AndyDefer\PhpClient\Enums\ContentType;
-use AndyDefer\PhpClient\Tests\Fixtures\Pokemon\Structures\PokemonListStruct;
-use AndyDefer\PhpClient\Tests\Fixtures\Pokemon\Structures\PokemonDetailStruct;
 
-// 1. Créer une Struct depuis un tableau
+// 1. Définir une Struct
+final class PokemonListStruct extends Struct
+{
+    public function __construct(
+        public readonly int $count,
+        public readonly ?string $next,
+        public readonly ?string $previous,
+        public readonly PokemonCollection $results,
+    ) {}
+}
+
+// 2. Créer une Struct depuis un tableau
 $struct = PokemonListStruct::from([
     'count' => 2,
     'next' => 'https://pokeapi.co/api/v2/pokemon?offset=2',
@@ -385,20 +417,20 @@ $struct = PokemonListStruct::from([
     ]
 ]);
 
-// 2. Encoder en JSON
+// 3. Encoder en JSON
 $json = $struct->encode(ContentType::JSON);
 // {"count":2,"next":"https:\/\/pokeapi.co\/api\/v2\/pokemon?offset=2","previous":null,"results":[{"name":"bulbasaur","url":"..."},{"name":"ivysaur","url":"..."}]}
 
-// 3. ✅ Recommandé : décoder avec fromJson()
+// 4. ✅ Recommandé : décoder avec fromJson()
 $decoded = PokemonListStruct::fromJson($json);
 echo $decoded->count; // 2
 
-// 4. ⚠️ Cas dynamique : décoder avec decode()
+// 5. ⚠️ Cas dynamique : décoder avec decode()
 $class = PokemonListStruct::class;
 $decoded = Struct::decode($json, $class);
 echo $decoded->count; // 2
 
-// 5. Struct avec Graph imbriqué
+// 6. Struct avec Graph imbriqué
 $detailStruct = PokemonDetailStruct::fromJson('{
     "data": {
         "id": "pikachu-001",
@@ -417,7 +449,7 @@ $detailStruct = PokemonDetailStruct::fromJson('{
 echo $detailStruct->data->name->getValue(); // Pikachu
 echo $detailStruct->data->height->getValue(); // 4
 
-// 6. Normalisation
+// 7. Normalisation
 $array = $detailStruct->toArray();
 print_r($array);
 // [
@@ -433,6 +465,8 @@ print_r($array);
 // ]
 ```
 
+---
+
 ## Voir aussi
 
 - `Graph` - Portion de structure de réponse API
@@ -440,4 +474,3 @@ print_r($array);
 - `AbstractRecord` - Classe de base des structures de données
 - `ResponseBodyVO` - Value Object pour le corps de réponse HTTP
 - `ContentType` - Enum des types de contenu supportés
----

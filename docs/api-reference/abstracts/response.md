@@ -10,7 +10,8 @@
 ResponseInterface
     └── Response (abstract)
             ├── PokemonListResponse
-            ├── InitiateDepositResponse
+            ├── CommentListResponse
+            ├── CreatePostResponse
             └── ...
 ```
 
@@ -25,6 +26,8 @@ ResponseInterface
 3. **Validation** du statut via `isSuccess()` et `isError()`
 4. **Base** pour toutes les réponses spécifiques
 5. **Accès** type-safe aux composants
+
+---
 
 ## API / Méthodes publiques
 
@@ -219,12 +222,16 @@ isSuccess() → bool (2xx)
 isError() → bool (4xx ou 5xx)
 ```
 
+---
+
 ## Gestion des erreurs
 
 | Situation | Exception | Message |
 |-----------|-----------|---------|
 | Body invalide | `InvalidArgumentException` | Varie selon `ResponseBodyVO` |
 | Headers invalides | Aucune | - |
+
+---
 
 ## Intégration
 
@@ -262,12 +269,16 @@ $response = new PokemonListResponse(
 $struct = $response->getBody()->getValue(); // PokemonListStruct
 ```
 
+---
+
 ## Performance
 
-- Construction en O(1)
-- Toutes les propriétés sont `readonly` (immutable)
-- Pas de copie profonde
-- `isSuccess()` et `isError()` en O(1)
+- **Construction** : O(1)
+- **Toutes les propriétés** : `readonly` (immutable)
+- **Pas de copie profonde**
+- **`isSuccess()` et `isError()`** : O(1)
+
+---
 
 ## Compatibilité
 
@@ -275,6 +286,8 @@ $struct = $response->getBody()->getValue(); // PokemonListStruct
 |---------|---------|
 | PHP 8.1+ | ✅ Complet |
 | PHP 8.2+ | ✅ Complet |
+
+---
 
 ## Exemple complet
 
@@ -288,7 +301,7 @@ use AndyDefer\PhpClient\Enums\HttpStatusCode;
 use AndyDefer\PhpClient\ValueObjects\ResponseBodyVO;
 use AndyDefer\PhpClient\ValueObjects\HeadersVO;
 
-// 1. Créer une réponse concrète
+// 1. Définir une réponse concrète
 final class CreateUserResponse extends Response
 {
     public function getUserId(): string
@@ -301,6 +314,11 @@ final class CreateUserResponse extends Response
     {
         $struct = $this->getBody()->getValue();
         return $struct->status;
+    }
+
+    public static function getStructClass(): string
+    {
+        return CreateUserStruct::class;
     }
 }
 
@@ -347,6 +365,8 @@ if ($errorResponse->isError()) {
 }
 ```
 
+---
+
 ## Voir aussi
 
 - `Request` - Requête HTTP
@@ -354,4 +374,3 @@ if ($errorResponse->isError()) {
 - `HeadersVO` - En-têtes HTTP
 - `HttpStatusCode` - Enum des codes de statut
 - `ResponseInterface` - Interface de réponse
----

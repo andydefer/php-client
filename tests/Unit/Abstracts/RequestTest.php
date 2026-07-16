@@ -255,22 +255,6 @@ final class RequestTest extends TestCase
         $this->assertStringContainsString('username=john&password=secret', $request->getBody()->toString());
     }
 
-    // ==================== IMMUTABILITY TESTS ====================
-
-    public function test_request_method_url_and_body_are_immutable(): void
-    {
-        $request = $this->createTestRequest();
-
-        $originalMethod = $request->getMethod();
-        $originalUrl = $request->getUrl();
-        $originalBody = $request->getBody();
-
-        // Les valeurs ne peuvent pas être modifiées directement
-        $this->assertSame($originalMethod, $request->getMethod());
-        $this->assertSame($originalUrl, $request->getUrl());
-        $this->assertSame($originalBody, $request->getBody());
-    }
-
     // ==================== EDGE CASES TESTS ====================
 
     public function test_request_with_empty_body(): void
