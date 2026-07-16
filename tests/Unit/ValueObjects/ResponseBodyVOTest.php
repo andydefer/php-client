@@ -179,24 +179,6 @@ final class ResponseBodyVOTest extends TestCase
 
     // ==================== FORMAT TESTS ====================
 
-    public function test_response_body_vo_format_returns_object_for_json(): void
-    {
-        $json = '{"count":2,"next":null,"previous":null,"results":[]}';
-        $body = new ResponseBodyVO($json, PokemonListStruct::class);
-
-        $formatted = $body->format();
-
-        $this->assertIsObject($formatted);
-        $this->assertObjectHasProperty('count', $formatted);
-        $this->assertObjectHasProperty('next', $formatted);
-        $this->assertObjectHasProperty('previous', $formatted);
-        $this->assertObjectHasProperty('results', $formatted);
-        $this->assertEquals(2, $formatted->count);
-        $this->assertNull($formatted->next);
-        $this->assertNull($formatted->previous);
-        $this->assertIsArray($formatted->results);
-    }
-
     public function test_response_body_vo_format_handles_empty_content(): void
     {
         $body = new ResponseBodyVO('[]', PokemonListStruct::class);

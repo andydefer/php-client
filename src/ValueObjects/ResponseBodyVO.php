@@ -118,7 +118,7 @@ final class ResponseBodyVO extends AbstractValueObject
     /**
      * Formate le contenu selon le Content-Type
      */
-    public function format(): array|object
+    public function format(): array
     {
         if ($this->content === null) {
             return [];
@@ -126,7 +126,15 @@ final class ResponseBodyVO extends AbstractValueObject
 
         if ($this->contentType->isJson()) {
             try {
-                return $this->formatJson();
+                $result = $this->formatJson();
+                if (is_object($result)) {
+                    return (array) $result;
+                }
+                if (is_array($result)) {
+                    return $result;
+                }
+
+                return [];
             } catch (InvalidArgumentException $e) {
                 return ['content' => $this->content];
             }
@@ -141,7 +149,7 @@ final class ResponseBodyVO extends AbstractValueObject
         }
 
         if (is_object($this->content)) {
-            return $this->content;
+            return (array) $this->content;
         }
 
         return ['content' => $this->content];
