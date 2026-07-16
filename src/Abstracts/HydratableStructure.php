@@ -32,7 +32,7 @@ abstract class HydratableStructure extends AbstractRecord
 
     public function toArray(): array
     {
-        return NormalizerChain::get()->normalize($this);
+        return NormalizerChain::get(true)->normalize($this);
     }
 
     public function getValue(): static

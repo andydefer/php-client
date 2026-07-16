@@ -11,6 +11,15 @@ use JsonException;
 abstract class Struct extends HydratableStructure
 {
     /**
+     * Les Graph conservent la casse originale des clés
+     * car ils représentent des données d'API.
+     */
+    protected function normalizeKey(string $key): string
+    {
+        return $key;
+    }
+
+    /**
      * Encode la structure vers le format spécifié
      */
     public function encode(ContentType $contentType = ContentType::JSON): string
