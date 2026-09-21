@@ -8,8 +8,8 @@ use AndyDefer\PhpClient\Abstracts\Request;
 use AndyDefer\PhpClient\Abstracts\Response;
 use AndyDefer\PhpClient\Contracts\ClientInterface;
 use AndyDefer\PhpClient\Enums\HttpMethod;
-use AndyDefer\PhpClient\Enums\HttpStatusCode;
 use AndyDefer\PhpClient\ValueObjects\ResponseBodyVO;
+use AndyDefer\PhpVo\Enums\HttpStatusCode;
 use GuzzleHttp\Client as GuzzleClient;
 use GuzzleHttp\Exception\GuzzleException;
 

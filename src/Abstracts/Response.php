@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace AndyDefer\PhpClient\Abstracts;
 
 use AndyDefer\PhpClient\Contracts\ResponseInterface;
-use AndyDefer\PhpClient\Enums\HttpStatusCode;
 use AndyDefer\PhpClient\ValueObjects\HeadersVO;
 use AndyDefer\PhpClient\ValueObjects\ResponseBodyVO;
+use AndyDefer\PhpVo\Enums\HttpStatusCode;
 
 abstract class Response implements ResponseInterface
 {

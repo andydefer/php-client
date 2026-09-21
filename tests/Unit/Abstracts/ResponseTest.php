@@ -7,13 +7,13 @@ namespace AndyDefer\PhpClient\Tests\Unit\Abstracts;
 use AndyDefer\PhpClient\Abstracts\Response;
 use AndyDefer\PhpClient\Enums\ContentType;
 use AndyDefer\PhpClient\Enums\HeaderType;
-use AndyDefer\PhpClient\Enums\HttpStatusCode;
 use AndyDefer\PhpClient\Tests\Fixtures\Pokemon\Structures\PokemonListStruct;
 use AndyDefer\PhpClient\Tests\Fixtures\Responses\TestErrorResponse;
 use AndyDefer\PhpClient\Tests\Fixtures\Responses\TestResponse;
 use AndyDefer\PhpClient\Tests\TestCase;
 use AndyDefer\PhpClient\ValueObjects\HeadersVO;
 use AndyDefer\PhpClient\ValueObjects\ResponseBodyVO;
+use AndyDefer\PhpVo\Enums\HttpStatusCode;
 
 final class ResponseTest extends TestCase
 {

@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace AndyDefer\PhpClient\Contracts;
 
-use AndyDefer\PhpClient\Enums\HttpStatusCode;
 use AndyDefer\PhpClient\ValueObjects\HeadersVO;
 use AndyDefer\PhpClient\ValueObjects\ResponseBodyVO;
+use AndyDefer\PhpVo\Enums\HttpStatusCode;
 
 interface ResponseInterface
 {
