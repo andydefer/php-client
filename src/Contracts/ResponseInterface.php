@@ -15,4 +15,8 @@ interface ResponseInterface
     public function getBody(): ResponseBodyVO;
 
     public function getHeaders(): HeadersVO;
+
+    public function isSuccess(): bool;
+
+    public function isError(): bool;
 }
