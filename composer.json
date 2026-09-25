@@ -21,7 +21,7 @@
     ],
     "require": {
         "php": "^8.2",
-        "andydefer/php-vo": "^0.25.1",
+        "andydefer/php-vo": "^0.25.2",
         "guzzlehttp/guzzle": "^7.11"
     },
     "require-dev": {
