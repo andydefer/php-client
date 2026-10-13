@@ -7,11 +7,13 @@ namespace AndyDefer\PhpClient\Clients;
 use AndyDefer\PhpClient\Abstracts\Request;
 use AndyDefer\PhpClient\Abstracts\Response;
 use AndyDefer\PhpClient\Contracts\ClientInterface;
+use AndyDefer\PhpClient\Enums\ContentType;
 use AndyDefer\PhpClient\Enums\HttpMethod;
 use AndyDefer\PhpClient\ValueObjects\ResponseBodyVO;
 use AndyDefer\PhpVo\Enums\HttpStatusCode;
 use GuzzleHttp\Client as GuzzleClient;
 use GuzzleHttp\Exception\GuzzleException;
+use Psr\Http\Message\ResponseInterface;
 
 final class ClientService implements ClientInterface
 {
@@ -99,7 +101,7 @@ final class ClientService implements ClientInterface
 
             $body = new ResponseBodyVO(
                 content: $guzzleResponse->getBody()->getContents(),
-                contentType: $request->getBody()->getContentType(),
+                contentType: $this->resolveResponseContentType($guzzleResponse),
                 structClass: $this->getStructClassFromResponse($responseClass)
             );
 
@@ -113,6 +115,26 @@ final class ClientService implements ClientInterface
                 $e
             );
         }
+    }
+
+    /**
+     * Resolve the ContentType from the response headers.
+     *
+     * Falls back to ContentType::default() when the header is missing
+     * or does not map to a known ContentType value.
+     */
+    private function resolveResponseContentType(ResponseInterface $response): ContentType
+    {
+        $header = $response->getHeaderLine('Content-Type');
+
+        if ($header === '') {
+            return ContentType::default();
+        }
+
+        // Strip parameters such as "; charset=utf-8"
+        $value = trim(explode(';', $header, 2)[0]);
+
+        return ContentType::tryFrom($value) ?? ContentType::default();
     }
 
     private function buildOptions(Request $request): array
