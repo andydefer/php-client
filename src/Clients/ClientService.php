@@ -141,17 +141,26 @@ final class ClientService implements ClientInterface
     {
         $options = [];
 
+        // 1. Headers fournis explicitement par la requête
         $headers = $request->getHeaders()->toArray();
+
+        // 2. Ajouter le Content-Type du body s'il n'est pas déjà défini
+        $body = $request->getBody();
+
+        if (! $body->isEmpty() && ! isset($headers['Content-Type'])) {
+            $headers['Content-Type'] = $body->getContentType()->value;
+        }
+
         if (! empty($headers)) {
             $options['headers'] = $headers;
         }
 
-        $body = $request->getBody();
-
+        // 3. Body
         if (! $body->isEmpty()) {
             $options['body'] = $body->toString();
         }
 
+        // 4. Options additionnelles
         $options = array_merge($options, $request->getOptions()->toArray());
 
         return $options;
